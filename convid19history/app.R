@@ -8,6 +8,7 @@
 #
 
 library(shiny)
+library(ggplot2)
 
 URL_Confirmed <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Confirmed.csv"
 URL_Deaths <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Deaths.csv"
@@ -32,19 +33,15 @@ ui <- fluidPage(
         sidebarPanel(
             dateRangeInput("daterange", "Date range", start="2020-01-22", format="mm-dd"),
             selectInput("country1", "Select a country", choices=countryList, selected="Taiwan*"),
-            selectInput("country1", "Select a country", choices=countryList, selected="China"),
-            selectInput("country1", "Select a country", choices=countryList, selected="None"),
-            selectInput("country1", "Select a country", choices=countryList, selected="None"),
-            actionButton("plot","Make plots"),
-            sliderInput("bins",
-                        "Number of bins:",
-                        min = 1,
-                        max = 50,
-                        value = 30)
+            selectInput("country2", "Select a country", choices=countryList, selected="China"),
+            selectInput("country3", "Select a country", choices=countryList, selected="None"),
+            selectInput("country4", "Select a country", choices=countryList, selected="None"),
+            actionButton("plot","Make plots")
         ),
 
         # Show a plot of the generated distribution
         mainPanel(
+           #textOutput("date_range"),
            plotOutput("confirmed_accu"),
            plotOutput("deaths_accu"),
            plotOutput("mortality")
@@ -54,9 +51,13 @@ ui <- fluidPage(
 
 # Define server logic required to draw a histogram
 server <- function(input, output) {
+    #output$date_range <- renderText({paste0("You select date range", input$daterange[2])})
 
     output$confirmed_accu <- renderPlot({
-        
+        #ggplot(data=df, aes(x=,y=))+
+        #geom_point()+
+        #xlab("Day")+ylab("Accumulated confirmed CONVID-19 cases")+
+        #theme_bw()
     })
 }
 
