@@ -40,15 +40,16 @@ ui <- fluidPage(
            dateRangeInput("daterange", "Select date range", start="2020-01-22", format="mm-dd"),
            helpText("Earliest report date is January 22nd, 2020"),
            helpText(""),
-           selectInput("country1", "Select a country", choices=countryList, selected="Taiwan*"),
-           selectInput("country2", "Select a country", choices=countryList, selected="China"),
-           selectInput("country3", "Select a country", choices=countryList, selected="Japan"),
-           selectInput("country4", "Select a country", choices=countryList, selected="Korea, South"),
+           selectInput("country1", "Select a country", choices=countryList, selected="China"),
+           selectInput("country2", "Select a country", choices=countryList, selected="US"),
+           selectInput("country3", "Select a country", choices=countryList, selected="Italy"),
+           selectInput("country4", "Select a country", choices=countryList, selected="Taiwan*"),
            actionButton("go",label="Show plots")
          ),
-         p("Data updated by Johns Hopkins University's Center for Systems Science and Engineering ",a(href="https://github.com/CSSEGISandData/COVID-19","(Github repo)")),
-         p("Taiwan*: Data from Taiwan are independently collected by Taiwan CDC and should not mix with data from China. TAIWAN is an INDEPENDENT country, not part of mainland China whatsoever.")
-      
+         p("Taiwan*: Data from Taiwan are independently collected by Taiwan CDC, and the country is still not a member of WHO."),
+         p("CONVID-19 data updated by Johns Hopkins University's Center for Systems Science and Engineering ",
+           a(href="https://github.com/CSSEGISandData/COVID-19","(Github repo)"), ". Country population size is based on 2019 data ",
+           a(href="https://worldpopulationreview.com/","(worldpopulationreview)"))
       ),
       column(width = 8,
          plotOutput("confirmed_accu"),
@@ -108,12 +109,14 @@ server <- function(input, output) {
             legend.title=element_text(size=16),legend.text=element_text(size=16))
     
     #make confirmed case per capita plot
-    plot_confirmed_pcap <- ggplot(data=df, aes(x=date, y=case_pcap, color=country))+
+    plot_prevalence <- ggplot(data=df, aes(x=date, y=case_pcap, color=country))+
       geom_point(shape=19, size=3)+
       scale_colour_hue(l=50)+
       scale_x_date(date_labels = "%b-%d", date_breaks = "1 week", limits = c(input$daterange[1], input$daterange[2]))+
-      ggtitle("Accumulated confirmed cases divided by country population size")+
-      xlab("Date")+ylab("Cases per capita")+
+      labs(title="Prevalence rate", subtitle="(confirmed cases / country population size)",
+           x="Date", y="Cases per capita")+
+      #ggtitle("Prevalence rate (confirmed cases / country population size)")+
+      #xlab("Date")+ylab("Cases per capita")+
       theme_bw()+
       theme(axis.title=element_text(size=16),axis.text=element_text(size=12),
             plot.title=element_text(size=18,face="bold"),
@@ -132,7 +135,7 @@ server <- function(input, output) {
             legend.title=element_text(size=16),legend.text=element_text(size=16))
     
     #output results
-    list(plot_confirmed=plot_confirmed, plot_confirmed_pcap=plot_confirmed_pcap, plot_deaths=plot_deaths)
+    list(plot_confirmed=plot_confirmed, plot_prevalence=plot_prevalence, plot_deaths=plot_deaths)
     
   })#for res <- eventReactive
   
@@ -142,7 +145,7 @@ server <- function(input, output) {
   })
   
   output$confirmed_percapita <- renderPlot({
-    res()$plot_confirmed_pcap
+    res()$plot_prevalence
   })
   
   output$deaths_accu <- renderPlot({
