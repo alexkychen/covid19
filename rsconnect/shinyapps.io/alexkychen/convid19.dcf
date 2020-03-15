@@ -5,9 +5,9 @@ account: alexkychen
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 1947565
-bundleId: 2881072
+bundleId: 2882397
 url: https://alexkychen.shinyapps.io/convid19/
-when: 1584195131.45788
+when: 1584242243.15204
 asMultiple: FALSE
 asStatic: FALSE
 ignoredFiles: test.R

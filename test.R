@@ -2,66 +2,172 @@ library(ggplot2)
 
 URL_Confirmed <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Confirmed.csv"
 URL_Deaths <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Deaths.csv"
+URL_Recovered <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Recovered.csv"
 
 data_confirmed <- read.csv(URL_Confirmed)
 data_deaths <- read.csv(URL_Deaths)
-
-date <- as.Date("2020-01-22") + 0:(ncol(data_confirmed)-5)
+#data_recovered <- read.csv(URL_Recovered)
 data_population <- read.csv("population.csv")
 
-#compile data for accumulated confirmed cases
-country1 <- "Taiwan*"
-country2 <- "China"
-country3 <- "US"
-country4 <- "Iran"
+#Get date
+date <- as.Date("2020-01-22") + 0:(ncol(data_confirmed)-5)
 
-countries <- c(country1,country2,country3,country4)
+#Get country
+countryList <- levels(data_confirmed$Country.Region)
+countryList <- c("None", countryList)
 
-df <- data.frame(matrix(ncol=0, nrow=0), stringsAsFactors=T)
+country <- ()
 
-for(i in countries){
-  if(i != "None"){
-    #get pop size 
-    one_population <- subset(data_population, name==i)
+# Define UI for application that draws a histogram
+ui <- fluidPage(
+  
+  # Application title
+  titlePanel("History of CONVID-19 cases by country"),
+  helpText("by Alex Chen"),
+  
+  fluidRow(
+    column(width = 3,
+           sidebarPanel( width=14,
+                         dateRangeInput("daterange", "Select date range", start="2020-01-22", format="mm-dd"),
+                         helpText("Earliest report date is January 22nd, 2020"),
+                         helpText(""),
+                         selectInput("country1", "Select a country", choices=countryList, selected="China"),
+                         selectInput("country2", "Select a country", choices=countryList, selected="US"),
+                         selectInput("country3", "Select a country", choices=countryList, selected="Italy"),
+                         selectInput("country4", "Select a country", choices=countryList, selected="Taiwan*"),
+                         actionButton("go",label="Show plots")
+           ),
+           p("Taiwan*: Data from Taiwan are independently collected by Taiwan CDC, and the country is still not a member of WHO."),
+           p("CONVID-19 data updated by Johns Hopkins University's Center for Systems Science and Engineering ",
+             a(href="https://github.com/CSSEGISandData/COVID-19","(Github repo)"), ". Country population size is based on 2019 data ",
+             a(href="https://worldpopulationreview.com/","(worldpopulationreview)")),
+           p("Powered by R Shiny. ",a(href="https://github.com/alexkychen/convid19","source code of this interface"))
+    ),
+    column(width = 7,
+           plotOutput("confirmed_accu"),
+           plotOutput("confirmed_percapita"),
+           plotOutput("deaths_accu")
+           #plotOutput("mortality")
+    ),
+    column(width = 2,
+           tableOutput("total_cases"),
+           tableOutput("max_prevalence"),
+           tableOutput("total_deaths")
+    )
+  )#close for fluidRow
+)
+
+# Define server logic required to draw a histogram
+server <- function(input, output) {
+  
+  res <- eventReactive(input$go, {
     
-    #get confirmed cases
-    one_country <- subset(data_confirmed, Country.Region==i, select=5:ncol(data_confirmed))
-    case_sum <- colSums(one_country)
-    case_percapita <- case_sum / one_population$popsize2019
+    #get selected country name
+    countries <- c(input$country1,input$country2,input$country3,input$country4)
+    countries <- c()
     
-    #get death cases
-    one_country_death <- subset(data_deaths, Country.Region==i, select=5:ncol(data_deaths))
-    death_sum <- colSums(one_country_death)
+    #create empty data frame (for all plots)
+    df <- data.frame(matrix(ncol=0, nrow=0))
     
+    #create empty data frame for total cases
+    df_total_cases <- data.frame(matrix(ncol=0, nrow=0))
     
-    if(i == "Taiwan*"){
-      one_df <- data.frame(date=date, cases=case_sum, case_pcap=case_percapita, death=death_sum, country=rep("Taiwan", length(case_sum)), stringsAsFactors=T)
-    }else{
-      one_df <- data.frame(date=date, cases=case_sum, case_pcap=case_percapita, death=death_sum, country=rep(i, length(case_sum)), stringsAsFactors=T)
+    i <- "China"
+    #compile data for confirmed cases
+    for(i in countries){
+      if(i != "None"){
+        
+        #get pop size 
+        one_population <- subset(data_population, name==i)
+        
+        #get confirmed cases
+        one_country <- subset(data_confirmed, Country.Region==i, select=5:ncol(data_confirmed))
+        case_sum <- colSums(one_country)#sum columns for a country that has multiple states/provinces
+        
+        #calculate cases per capita 
+        case_percapita <- case_sum / one_population$popsize2019
+        
+        #get death cases
+        one_country_death <- subset(data_deaths, Country.Region==i, select=5:ncol(data_deaths))
+        death_sum <- colSums(one_country_death)
+        
+        #create data frame for one country 
+        if(i == "Taiwan*"){
+          one_df <- data.frame(date=date, cases=case_sum, case_pcap=case_percapita, 
+                               death=death_sum, country=rep("Taiwan", length(case_sum)))
+        }else{
+          one_df <- data.frame(date=date, cases=case_sum, case_pcap=case_percapita, 
+                               death=death_sum, country=rep(i, length(case_sum)))
+        }
+        
+        #subset data for selected last date
+        df_total_case <- subset(one_df, date==input$daterange[2], select=c(country, cases))
+        df_total_case <- subset(one_df, date=="2020-03-13", select=c(country, cases))
+        
+        #add data together
+        df <- rbind(df, one_df)
+        df_total_cases <- rbind(df_total_cases, df_total_case)
+      }
     }
-    df <- rbind(df, one_df)
-  }
+    
+    #make confirmed case plot
+    plot_confirmed <- ggplot(data=df, aes(x=date, y=cases, color=country))+
+      geom_point(shape=19, size=3)+
+      scale_colour_hue(l=50)+
+      scale_x_date(date_labels = "%b-%d", date_breaks = "1 week", limits = c(input$daterange[1], input$daterange[2]))+
+      ggtitle("Accumulated Confirmed Cases")+
+      xlab("Date")+ylab("Number of cases")+
+      theme_bw()+
+      theme(axis.title=element_text(size=16),axis.text=element_text(size=12),
+            plot.title=element_text(size=18,face="bold"),
+            legend.title=element_blank(),legend.text=element_text(size=16),legend.position=c(0.1,0.8))
+    
+    #make confirmed case per capita plot
+    plot_prevalence <- ggplot(data=df, aes(x=date, y=case_pcap, color=country))+
+      geom_point(shape=19, size=3)+
+      scale_colour_hue(l=50)+
+      scale_x_date(date_labels = "%b-%d", date_breaks = "1 week", limits = c(input$daterange[1], input$daterange[2]))+
+      labs(title="Prevalence Rate", subtitle="(confirmed cases / country population size)",
+           x="Date", y="Cases per capita")+
+      #ggtitle("Prevalence rate (confirmed cases / country population size)")+
+      #xlab("Date")+ylab("Cases per capita")+
+      theme_bw()+
+      theme(axis.title=element_text(size=16),axis.text=element_text(size=12),
+            plot.title=element_text(size=18,face="bold"),
+            legend.title=element_blank(),legend.text=element_text(size=16),legend.position=c(0.1,0.8))
+    
+    #make death case plot
+    plot_deaths <- ggplot(data=df, aes(x=date, y=death, color=country))+
+      geom_point(shape=19, size=3)+
+      scale_colour_hue(l=50)+
+      scale_x_date(date_labels = "%b-%d", date_breaks = "1 week", limits = c(input$daterange[1], input$daterange[2]))+
+      ggtitle("Accumulated Deaths")+
+      xlab("Date")+ylab("Number of deaths")+
+      theme_bw()+
+      theme(axis.title=element_text(size=16),axis.text=element_text(size=12),
+            plot.title=element_text(size=18,face="bold"),
+            legend.title=element_blank(),legend.text=element_text(size=16),legend.position=c(0.1,0.8))
+    
+    #output results
+    list(plot_confirmed=plot_confirmed, plot_prevalence=plot_prevalence, plot_deaths=plot_deaths, df_total_cases=df_total_cases)
+    
+  })#for res <- eventReactive
+  
+  #render plot
+  output$confirmed_accu <- renderPlot({
+    res()$plot_confirmed
+  })
+  
+  output$confirmed_percapita <- renderPlot({
+    res()$plot_prevalence
+  })
+  
+  output$deaths_accu <- renderPlot({
+    res()$plot_deaths
+  })
+  
+  output$total_cases <- renderTable({
+    res()$df_total_cases
+  },striped=T, digits=0, caption="Total confirmed cases of each country")
 }
 
-#make plot
-ggplot(data=df, aes(x=date, y=cases, color=country))+
-  geom_point(shape=19)+
-  scale_colour_hue(l=50)+
-  scale_x_date(date_labels = "%b-%d", date_breaks = "1 week")+
-  ggtitle("Accumulated cases")+
-  xlab("Date")+ylab("Number of cases")+
-  theme_bw()+
-  theme(axis.title=element_text(size=16),axis.text=element_text(size=12),
-        plot.title=element_text(size=18,face="bold"),
-        legend.title=element_text(size=16),legend.text=element_text(size=16))
-
-ggplot(data=df, aes(x=date, y=case_pcap, color=country))+
-  geom_point(shape=19, size=3)+
-  scale_colour_hue(l=50)+
-  scale_x_date(date_labels = "%b-%d", date_breaks = "1 week")+
-  ggtitle("Accumulated cases per capita")+
-  xlab("Date")+ylab("cases per capita")+
-  theme_bw()+
-  theme(axis.title=element_text(size=16),axis.text=element_text(size=12),
-        plot.title=element_text(size=18,face="bold"),
-        legend.title=element_text(size=16),legend.text=element_text(size=16))
