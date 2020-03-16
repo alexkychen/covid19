@@ -1,0 +1,13 @@
+name: covid19
+title: covid19
+username:
+account: alexkychen
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 1954408
+bundleId: 2886806
+url: https://alexkychen.shinyapps.io/covid19/
+when: 1584370809.37914
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: test.R

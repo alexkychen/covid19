@@ -71,10 +71,11 @@ ui <- fluidPage(
            actionButton("go",label="Show Me")
          ),
          p("Taiwan*: Data from Taiwan are independently collected by Taiwan CDC, and the country is still not a member of WHO."),
-         p("CONVID-19 data updated by Johns Hopkins University's Center for Systems Science and Engineering ",
-           a(href="https://github.com/CSSEGISandData/COVID-19","(Github repo)"), ". Country population size is based on 2019 data ",
-           a(href="https://worldpopulationreview.com/","(worldpopulationreview)")),
-         p("Powered by R Shiny. ",a(href="https://github.com/alexkychen/convid19","source code of this interface"))
+         p("COVID-19 data are updated by Johns Hopkins University's ", 
+           a(href="https://github.com/CSSEGISandData/COVID-19","Center for Systems Science and Engineering"),
+           ", and country population size is based on ",a(href="https://worldpopulationreview.com/","2019 global data.")),
+         p("Powered by R Shiny. | ",a(href="https://github.com/alexkychen/covid19","Source code of interface"),
+           " | ",a(href="https://github.com/alexkychen/covid19/issues","Report issue"))
       ),
       column(width = 8,
          strong(textOutput("summary_caption")),
