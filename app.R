@@ -78,11 +78,14 @@ ui <- fluidPage(
            " | ",a(href="https://github.com/alexkychen/covid19/issues","Report issue"))
       ),
       column(width = 8,
-         strong(textOutput("summary_caption")),
+         h4(textOutput("summary_caption")),
+         textOutput("summary_unit"),
          tableOutput("summary_table"),
+
          plotOutput("confirmed_accu"),
          plotOutput("confirmed_percapita"),
-         plotOutput("deaths_accu")
+         plotOutput("deaths_accu"),
+         plotOutput("dailycases")
         
       )
       
@@ -106,96 +109,130 @@ server <- function(input, output) {
     
     #create empty data frame
     df <- data.frame(matrix(ncol=0, nrow=0))#for all plots
-    df_summary <- data.frame(matrix(ncol=0, nrow=0))#for summary table
+    df_table <- data.frame(matrix(ncol=0, nrow=0))#for summary table
     
     #compile data for confirmed cases
     for(i in countries){
       if(i != "None"){
         
-        #get pop size 
-        one_population <- subset(data_population, name==i)
+        #get population size
+        country_data <- subset(data_population, name==i)
+        country_population <- country_data$popsize2019
+        country_pop10E6 <- country_population/1000000
         
-        #get confirmed cases
-        one_country <- subset(data_confirmed, Country.Region==i, select=5:ncol(data_confirmed))
-        case_sum <- colSums(one_country)#sum columns for a country that has multiple states/provinces
+        #get accumulative confirmed cases
+        acc_confirmed_data <- subset(data_confirmed, Country.Region==i, select=5:ncol(data_confirmed))
+        #sum columns for multiple regions(rows)
+        acc_confirmed_sum <- colSums(acc_confirmed_data)
         
-        #calculate cases per capita 
-        case_percapita <- (case_sum / one_population$popsize2019)*100000
+        #get new cases of each day
+        new_case_day <- acc_confirmed_sum[2:length(acc_confirmed_sum)] - acc_confirmed_sum[1:length(acc_confirmed_sum)-1]
+        new_case_day <- c(NA, new_case_day) #add NA data to first date for 2020-1-22
         
-        #get death cases
-        one_country_death <- subset(data_deaths, Country.Region==i, select=5:ncol(data_deaths))
-        death_sum <- colSums(one_country_death)
+        #get accumulative recovered cases
+        acc_recovered_data <- subset(data_recovered, Country.Region==i, select=5:ncol(data_recovered))
+        #sum columns for multiple regions(rows)
+        acc_recovered_sum <- colSums(acc_recovered_data)
         
-        #create data frame for one country 
+        #calculate prevalence rate
+        preval <- (acc_confirmed_sum - acc_recovered_sum) / country_pop10E6
+        
+        #get accumulative deaths
+        acc_deaths_data <- subset(data_deaths, Country.Region==i, select=5:ncol(data_deaths))
+        acc_deaths_sum <- colSums(acc_deaths_data)
+        
+        #get new deaths of each day
+        new_death_day <- acc_deaths_sum[2:length(acc_deaths_sum)] - acc_deaths_sum[1:length(acc_deaths_sum)-1]
+        new_death_day <- c(NA, new_death_day)
+        
+        #calculate fatality rate
+        fatal <- (acc_deaths_sum / acc_confirmed_sum) * 100
+        
+        #create data frame
         if(i == "Taiwan*"){
-          one_df <- data.frame(date=date, cases=case_sum, case_pcap=case_percapita, 
-                               death=death_sum, country=rep("Taiwan", length(case_sum)))
+          df_one <- data.frame(country=rep("Taiwan", length(acc_confirmed_sum)), date=date, pop.size=country_pop10E6, 
+                               accu.case=acc_confirmed_sum, new.case=new_case_day, prevalence=preval, accu.death=acc_deaths_sum,
+                               new.death=new_death_day, fatality=fatal, row.names=NULL)
         }else{
-          one_df <- data.frame(date=date, cases=case_sum, case_pcap=case_percapita, 
-                               death=death_sum, country=rep(i, length(case_sum)))
-        }
+          df_one <- data.frame(country=rep(i, length(acc_confirmed_sum)), date=date, pop.size=country_pop10E6, 
+                               accu.case=acc_confirmed_sum, new.case=new_case_day, prevalence=preval, accu.death=acc_deaths_sum,
+                               new.death=new_death_day, fatality=fatal, row.names=NULL)
+        } 
+        #extract data for summary table
+        df_table_one <- subset(df_one, date==end_date, select=c(country, pop.size, accu.case, prevalence, accu.death, fatality))
         
-        #subset data for selected last date 
-        df_summary_one <- subset(one_df, date==end_date, select=c(country, cases, case_pcap, death))
-        
-        #add data together
-        df <- rbind(df, one_df)
-        df_summary <- rbind(df_summary, df_summary_one)
+        #concatenate data set
+        df <- rbind(df, df_one)
+        df_table <- rbind(df_table, df_table_one)
       }
     }#end for loop
     
     #create caption for each table
-    caption1 <- paste("Summary as of ", end_date)
+    caption1 <- paste("Summary of epidemiological characteristics as of ", end_date)
+    caption2 <- "Population*: million; Prevalence*:cases per million people; Fatality*: %"
 
     
-    #make confirmed case plot
-    plot_confirmed <- ggplot(data=df, aes(x=date, y=cases, color=country))+
+    #Accumulative confirmed case plot
+    plot_confirmed <- ggplot(data=df, aes(x=date, y=accu.case, color=country))+
       geom_point(shape=19, size=3)+
       scale_colour_hue(l=50)+
       scale_x_date(date_labels = "%b-%d", date_breaks = "1 week", limits = c(start_date, end_date))+
-      ggtitle("Accumulated Confirmed Cases")+
+      ggtitle("Accumulative Confirmed Cases")+
       xlab("Date")+ylab("Number of cases")+
       theme_bw()+
       theme(axis.title=element_text(size=16),axis.text=element_text(size=12),
             plot.title=element_text(size=18,face="bold"),
             legend.title=element_blank(),legend.text=element_text(size=16),legend.position=c(0.1,0.8))
     
-    #make confirmed case per capita plot
-    plot_prevalence <- ggplot(data=df, aes(x=date, y=case_pcap, color=country))+
+    #Prevalence rate plot
+    plot_prevalence <- ggplot(data=df, aes(x=date, y=prevalence, color=country))+
       geom_point(shape=19, size=3)+
       scale_colour_hue(l=50)+
       scale_x_date(date_labels = "%b-%d", date_breaks = "1 week", limits = c(start_date, end_date))+
-      labs(title="Prevalence Rate", subtitle="(confirmed cases / country population size)",
-           x="Date", y="Cases per capita")+
-      #ggtitle("Prevalence rate (confirmed cases / country population size)")+
-      #xlab("Date")+ylab("Cases per capita")+
+      labs(title="Prevalence Rate", subtitle="[ (confirmed cases - recovered cases) / population size ]",
+           x="Date", y="Infected cases per million people")+
       theme_bw()+
       theme(axis.title=element_text(size=16),axis.text=element_text(size=12),
             plot.title=element_text(size=18,face="bold"),
             legend.title=element_blank(),legend.text=element_text(size=16),legend.position=c(0.1,0.8))
     
-    #make death case plot
-    plot_deaths <- ggplot(data=df, aes(x=date, y=death, color=country))+
+    #Accumulative deaths plot
+    plot_deaths <- ggplot(data=df, aes(x=date, y=accu.death, color=country))+
       geom_point(shape=19, size=3)+
       scale_colour_hue(l=50)+
       scale_x_date(date_labels = "%b-%d", date_breaks = "1 week", limits = c(start_date, end_date))+
-      ggtitle("Accumulated Deaths")+
+      ggtitle("Accumulative Deaths")+
       xlab("Date")+ylab("Number of deaths")+
       theme_bw()+
       theme(axis.title=element_text(size=16),axis.text=element_text(size=12),
             plot.title=element_text(size=18,face="bold"),
             legend.title=element_blank(),legend.text=element_text(size=16),legend.position=c(0.1,0.8))
     
-    #adjust summary table format
-    df_summary$cases <- format(df_summary$cases, digits=1)
-    df_summary$case_pcap <- format(df_summary$case_pcap, digits=3)
-    df_summary$death <- format(df_summary$death, digits=1)
+    #Daily confirmed cases
+    plot_newcase <- ggplot(data=df, aes(x=date, y=new.case, fill=country))+
+      geom_bar(stat="identity",position=position_dodge())+
+      scale_fill_hue(l=50)+
+      scale_x_date(date_labels = "%b-%d", date_breaks = "1 week", limits = c(start_date, end_date))+
+      labs(title="Daily Confirmed Cases", x="Date", y="Number of cases")+
+      theme_bw()+
+      theme(axis.title=element_text(size=16),axis.text=element_text(size=12),
+            plot.title=element_text(size=18,face="bold"),
+            legend.title=element_blank(),legend.text=element_text(size=16),legend.position=c(0.1,0.8))
     
-    #rename column name of summary table
-    names(df_summary) <- c("Country", "Total cases", "Prevalence rate", "Total deaths")
-  
+    
+    #adjust summary table format
+    df_table$pop.size <- format(round(df_table$pop.size, digits=2))
+    df_table$accu.case <- format(df_table$accu.case)
+    df_table$prevalence <- format(round(df_table$prevalence, digits=2))
+    df_table$accu.death <- format(df_table$accu.death)
+    df_table$fatality <- format(round(df_table$fatality, digits=2))
+    
+    #change table column names
+    names(df_table) <- c("Country","Population*", "Confirmed cases","Prevalence*", "Deaths","Fatality*")
+    
     #output results
-    list(plot_confirmed=plot_confirmed, plot_prevalence=plot_prevalence, plot_deaths=plot_deaths, df_summary=df_summary, caption1=caption1)
+    list(df_table=df_table, caption1=caption1, caption2=caption2,
+         plot_confirmed=plot_confirmed, plot_prevalence=plot_prevalence, plot_deaths=plot_deaths, plot_newcase=plot_newcase)
   
     })#end of withProgress
   
@@ -207,8 +244,13 @@ server <- function(input, output) {
   })
   
   output$summary_table <- renderTable({
-    res()$df_summary
-  },striped=T)
+    res()$df_table
+  },striped=T, align="r")
+  
+  output$summary_unit <- renderText({
+    res()$caption2
+  })
+  
   
   #render plot
   output$confirmed_accu <- renderPlot({
@@ -226,6 +268,12 @@ server <- function(input, output) {
   output$deaths_accu <- renderPlot({
     withProgress(message="Making 3rd plot",{
       res()$plot_deaths
+    })
+  })
+  
+  output$dailycases <- renderPlot({
+    withProgress(message="Making 4th plot",{
+      res()$plot_newcase
     })
   })
   
