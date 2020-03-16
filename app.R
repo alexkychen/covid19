@@ -16,10 +16,34 @@ URL_Recovered <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/mast
 
 data_confirmed <- read.csv(URL_Confirmed)
 data_deaths <- read.csv(URL_Deaths)
-#data_recovered <- read.csv(URL_Recovered)
+data_recovered <- read.csv(URL_Recovered)
 data_population <- read.csv("population.csv")
 
-#Get date
+data_all <- list(data_confirmed, data_deaths, data_recovered)
+#check data dimension and NA data
+dfsize <- dim(data_confirmed)
+for(df in data_all){
+  #check no. of row
+  if(nrow(df) != dfsize[1]){
+    cat("Error: Imported data frame no. of row not identical")
+  }
+  #check no. of column
+  if(ncol(df) != dfsize[2]){
+    cat("Error: Imported data frame no. of column not identical ")
+  }
+}
+
+#check if last column data is NA (or more than 200 data point is NA), if so, remove it
+if(sum(is.na(data_confirmed[,ncol(data_confirmed)])) > 200){
+  data_confirmed <- data_confirmed[,1:ncol(data_confirmed)-1]
+  if(ncol(data_deaths) > ncol(data_confirmed)){
+    data_deaths <- data_deaths[,1:nol(data_deaths)-1]
+  }
+  if(ncol(data_recovered) > ncol(data_confirmed)){
+    data_recovered <- data_recovered[,1:ncol(data_recovered)-1]
+  }
+}
+#get date
 date <- as.Date("2020-01-22") + 0:(ncol(data_confirmed)-5)
 
 #Get country
@@ -37,14 +61,14 @@ ui <- fluidPage(
     fluidRow(
       column(width = 4,
          sidebarPanel( width=14,
-           dateRangeInput("daterange", "Select date range", start="2020-01-22", format="mm-dd"),
+           dateRangeInput("daterange", "Select date range", start="2020-01-22", end=date[length(date)], format="mm-dd"),
            helpText("Earliest report date is January 22nd, 2020"),
            helpText(""),
            selectInput("country1", "Select a country", choices=countryList, selected="China"),
            selectInput("country2", "Select a country", choices=countryList, selected="US"),
            selectInput("country3", "Select a country", choices=countryList, selected="Italy"),
            selectInput("country4", "Select a country", choices=countryList, selected="Taiwan*"),
-           actionButton("go",label="Show plots")
+           actionButton("go",label="Show Me")
          ),
          p("Taiwan*: Data from Taiwan are independently collected by Taiwan CDC, and the country is still not a member of WHO."),
          p("CONVID-19 data updated by Johns Hopkins University's Center for Systems Science and Engineering ",
@@ -58,7 +82,7 @@ ui <- fluidPage(
          plotOutput("confirmed_accu"),
          plotOutput("confirmed_percapita"),
          plotOutput("deaths_accu")
-         #plotOutput("mortality")
+        
       )
       
     )#close for fluidRow
@@ -79,11 +103,6 @@ server <- function(input, output) {
     start_date <- input$daterange[1]
     end_date <- input$daterange[2]
     
-    #check if last date data are NA
-    if(is.na(data_confirmed[1,ncol(data_confirmed)])){
-      end_date <- as.Date(end_date) - 1
-    }
-    
     #create empty data frame
     df <- data.frame(matrix(ncol=0, nrow=0))#for all plots
     df_summary <- data.frame(matrix(ncol=0, nrow=0))#for summary table
@@ -100,7 +119,7 @@ server <- function(input, output) {
         case_sum <- colSums(one_country)#sum columns for a country that has multiple states/provinces
         
         #calculate cases per capita 
-        case_percapita <- case_sum / one_population$popsize2019
+        case_percapita <- (case_sum / one_population$popsize2019)*100000
         
         #get death cases
         one_country_death <- subset(data_deaths, Country.Region==i, select=5:ncol(data_deaths))
@@ -115,14 +134,14 @@ server <- function(input, output) {
                                death=death_sum, country=rep(i, length(case_sum)))
         }
         
-        #subset data for selected last date
+        #subset data for selected last date 
         df_summary_one <- subset(one_df, date==end_date, select=c(country, cases, case_pcap, death))
         
         #add data together
         df <- rbind(df, one_df)
         df_summary <- rbind(df_summary, df_summary_one)
       }
-    }
+    }#end for loop
     
     #create caption for each table
     caption1 <- paste("Summary as of ", end_date)
