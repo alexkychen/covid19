@@ -55,8 +55,8 @@ countryList <- c("None", countryList)
 ui <- fluidPage(
 
     # Application title
-    titlePanel("History of CONVID-19 cases by country"),
-    helpText("by Alex Chen"),
+    titlePanel("Time course of COVID-19 epidemiological characteristics by country"),
+    helpText("developed by Alex Chen"),
     
     fluidRow(
       column(width = 4,
