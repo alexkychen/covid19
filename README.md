@@ -22,7 +22,7 @@ This app is developed to help understand how 2019 Novel Coronavirus (COVID-19) i
 - Number of accumulative deaths over time
 - New confirmed cases of each day over time 
 
-#### Plot examples
+### Plot examples
 
 ![](/plots/accu_cases.png)
 ![](/plots/prevalence.png)
