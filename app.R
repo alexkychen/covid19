@@ -48,6 +48,13 @@ date <- as.Date("2020-01-22") + 0:(ncol(data_confirmed)-5)
 
 #Get country
 countryList <- levels(data_confirmed$Country.Region)
+#remove country names not in data_population
+for(c in countryList){
+  if(c %in% data_population$name==FALSE){
+    countryList <- countryList[countryList!=c]
+  }
+}
+#add None option
 countryList <- c("None", countryList)
 
 

@@ -5,9 +5,9 @@ account: alexkychen
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 1954408
-bundleId: 2886806
+bundleId: 2892595
 url: https://alexkychen.shinyapps.io/covid19/
-when: 1584370809.37914
+when: 1584503631.00493
 asMultiple: FALSE
 asStatic: FALSE
-ignoredFiles: test.R
+ignoredFiles: test.R|plots/accu_cases.png|plots/accu_deaths.png|plots/dailycase.png|plots/prevalence.png
