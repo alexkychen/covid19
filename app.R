@@ -92,7 +92,8 @@ ui <- fluidPage(
          plotOutput("confirmed_accu"),
          plotOutput("confirmed_percapita"),
          plotOutput("deaths_accu"),
-         plotOutput("dailycases")
+         plotOutput("dailycases"),
+         plotOutput("confirmed_case50")
         
       )
       
@@ -132,6 +133,11 @@ server <- function(input, output) {
         #sum columns for multiple regions(rows)
         acc_confirmed_sum <- colSums(acc_confirmed_data)
         
+        #get number of dates which cases are less/greater than 50
+        case50greater <- length(acc_confirmed_sum[acc_confirmed_sum >= 50])
+        case50less <- length(acc_confirmed_sum) - case50greater
+        case50day <- c(rep(NA, case50less), 0:(case50greater-1))
+        
         #get new cases of each day
         new_case_day <- acc_confirmed_sum[2:length(acc_confirmed_sum)] - acc_confirmed_sum[1:length(acc_confirmed_sum)-1]
         new_case_day <- c(NA, new_case_day) #add NA data to first date for 2020-1-22
@@ -158,12 +164,12 @@ server <- function(input, output) {
         #create data frame
         if(i == "Taiwan*"){
           df_one <- data.frame(country=rep("Taiwan", length(acc_confirmed_sum)), date=date, pop.size=country_pop10E6, 
-                               accu.case=acc_confirmed_sum, new.case=new_case_day, prevalence=preval, accu.death=acc_deaths_sum,
-                               new.death=new_death_day, fatality=fatal, row.names=NULL)
+                               accu.case=acc_confirmed_sum, case50day=case50day, new.case=new_case_day, prevalence=preval, 
+                               accu.death=acc_deaths_sum, new.death=new_death_day, fatality=fatal, row.names=NULL)
         }else{
           df_one <- data.frame(country=rep(i, length(acc_confirmed_sum)), date=date, pop.size=country_pop10E6, 
-                               accu.case=acc_confirmed_sum, new.case=new_case_day, prevalence=preval, accu.death=acc_deaths_sum,
-                               new.death=new_death_day, fatality=fatal, row.names=NULL)
+                               accu.case=acc_confirmed_sum, case50day=case50day, new.case=new_case_day, prevalence=preval,
+                               accu.death=acc_deaths_sum, new.death=new_death_day, fatality=fatal, row.names=NULL)
         } 
         #extract data for summary table
         df_table_one <- subset(df_one, date==end_date, select=c(country, pop.size, accu.case, prevalence, accu.death, fatality))
@@ -226,6 +232,27 @@ server <- function(input, output) {
             plot.title=element_text(size=18,face="bold"),
             legend.title=element_blank(),legend.text=element_text(size=16),legend.position=c(0.1,0.8))
     
+    #accumulative confirmed cases after 50th case 
+    #subset data which accu.case is greater than 50
+    df_case50 <- subset(df, accu.case>=50)
+    #get longest day of country
+    maxDay <- max(df_case50$case50day)
+    #count country name characters
+    country_maxDay <- as.character(df_case50[which(df_case50$case50day==maxDay),]$country)
+    country_maxChar <- max(nchar(country_maxDay))
+    x_max <- maxDay + country_maxChar
+    
+    plot_case50 <- ggplot(data=df_case50, aes(x=case50day, y=accu.case, color=country))+
+      geom_point(shape=19, size=2)+geom_line(size=1.3)+
+      scale_colour_hue(l=50)+
+      scale_x_continuous(limits=c(0,x_max), breaks=seq(0, x_max, 5))+
+      labs(title="Accumulative Confirmed Cases After 50th Case",x="Day since 50th confirmed case",y="Number of cases")+
+      theme_bw()+
+      theme(axis.title=element_text(size=16),axis.text=element_text(size=12),
+            plot.title=element_text(size=18,face="bold"),
+            legend.position="none")+
+      geom_dl(aes(label = country), method = list(dl.trans(x = x + 0.2), "last.points", cex =1.5)) 
+    
     
     #adjust summary table format
     df_table$pop.size <- format(round(df_table$pop.size, digits=2))
@@ -239,7 +266,8 @@ server <- function(input, output) {
     
     #output results
     list(df_table=df_table, caption1=caption1, caption2=caption2,
-         plot_confirmed=plot_confirmed, plot_prevalence=plot_prevalence, plot_deaths=plot_deaths, plot_newcase=plot_newcase)
+         plot_confirmed=plot_confirmed, plot_prevalence=plot_prevalence, plot_deaths=plot_deaths, plot_newcase=plot_newcase,
+         plot_case50=plot_case50)
   
     })#end of withProgress
   
@@ -281,6 +309,12 @@ server <- function(input, output) {
   output$dailycases <- renderPlot({
     withProgress(message="Making 4th plot",{
       res()$plot_newcase
+    })
+  })
+  
+  output$confirmed_case50 <- renderPlot({
+    withProgress(message="Making 5th plot",{
+      res()$plot_case50
     })
   })
   

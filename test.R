@@ -1,4 +1,5 @@
 library(ggplot2)
+library(directlabels)
 
 URL_Confirmed <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Confirmed.csv"
 URL_Deaths <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Deaths.csv"
@@ -58,7 +59,7 @@ end_date <- "2020-03-15"
 df <- data.frame(matrix(ncol=0, nrow=0))#for all plots
 df_table <- data.frame(matrix(ncol=0, nrow=0))#for summary table
 
-i <- "US"
+i <- "China"
 
 #for each selected country
     for(i in countries){
@@ -73,6 +74,11 @@ i <- "US"
         acc_confirmed_data <- subset(data_confirmed, Country.Region==i, select=5:ncol(data_confirmed))
         #sum columns for multiple regions(rows)
         acc_confirmed_sum <- colSums(acc_confirmed_data)
+        
+        #get number of dates which cases are less/greater than 50
+        case50greater <- length(acc_confirmed_sum[acc_confirmed_sum >= 50])
+        case50less <- length(acc_confirmed_sum) - case50greater
+        case50day <- c(rep(NA, case50less), 0:(case50greater-1))
         
         #get new cases of each day
         new_case_day <- acc_confirmed_sum[2:length(acc_confirmed_sum)] - acc_confirmed_sum[1:length(acc_confirmed_sum)-1]
@@ -100,11 +106,11 @@ i <- "US"
         #create data frame
         if(i == "Taiwan*"){
           df_one <- data.frame(country=rep("Taiwan", length(acc_confirmed_sum)), date=date, pop.size=country_pop10E6, 
-                               accu.case=acc_confirmed_sum, new.case=new_case_day, prevalence=preval, accu.death=acc_deaths_sum,
+                               accu.case=acc_confirmed_sum, case50day=case50day, new.case=new_case_day, prevalence=preval, accu.death=acc_deaths_sum,
                                new.death=new_death_day, fatality=fatal, row.names=NULL)
         }else{
           df_one <- data.frame(country=rep(i, length(acc_confirmed_sum)), date=date, pop.size=country_pop10E6, 
-                               accu.case=acc_confirmed_sum, new.case=new_case_day, prevalence=preval, accu.death=acc_deaths_sum,
+                               accu.case=acc_confirmed_sum, case50day=case50day, new.case=new_case_day, prevalence=preval, accu.death=acc_deaths_sum,
                                new.death=new_death_day, fatality=fatal, row.names=NULL)
         } 
         #extract data for summary table
@@ -138,3 +144,23 @@ ggplot(data=df, aes(x=date, y=new.case, fill=country))+
         plot.title=element_text(size=18,face="bold"),
         legend.title=element_blank(),legend.text=element_text(size=16),legend.position=c(0.1,0.8))
   
+#accumulative confirmed cases after 50th case 
+#subset data which accu.case is greater than 50
+df_case50 <- subset(df, accu.case>=50)
+#get longest day of country
+maxDay <- max(df_case50$case50day)
+#count country name characters
+country_maxDay <- as.character(df_case50[which(df_case50$case50day==maxDay),]$country)
+country_maxChar <- max(nchar(country_maxDay))
+x_max <- maxDay + country_maxChar
+
+ggplot(data=df_case50, aes(x=case50day, y=accu.case, color=country))+
+  geom_point(shape=19, size=2)+geom_line(size=1.3)+
+  scale_colour_hue(l=50)+
+  scale_x_continuous(limits=c(0,x_max), breaks=seq(0, x_max, 5))+
+  labs(title="Accumulative Confirmed Cases After 50th Case",x="Day since 50th confirmed case",y="Number of cases")+
+  theme_bw()+
+  theme(axis.title=element_text(size=16),axis.text=element_text(size=12),
+        plot.title=element_text(size=18,face="bold"),
+        legend.position="none")+
+  geom_dl(aes(label = country), method = list(dl.trans(x = x + 0.2), "last.points", cex =1.5)) 
